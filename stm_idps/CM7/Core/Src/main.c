@@ -1,236 +1,128 @@
-/* USER CODE BEGIN Header */
-/**
-  ******************************************************************************
-  * @file           : main.c
-  * @brief          : Main program body
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2026 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
-  */
-/* USER CODE END Header */
-/* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "eth.h"
-#include "gpio.h"
 
-/* Private includes ----------------------------------------------------------*/
-/* USER CODE BEGIN Includes */
-#include "app.h"
-/* USER CODE END Includes */
+// set memory regions of each module
+Packet_t ntcm_ring[RING_SLOTS] __attribute__((section(".NTCMSection")));
+Flow flow __attribute__((section(".NFEMSection")));
+float feat[IEC104_FEATURE_COUNT] __attribute__((section(".DESection")));
 
-/* Private typedef -----------------------------------------------------------*/
-/* USER CODE BEGIN PTD */
+ETH_DMADesc_t DMARxDscrTab[RING_SLOTS];
+void ETH_Init(void){
+    // RMII
+    SYSCFG->PMCR |= SYSCFG_PMCR_EPIS_SEL_2;
 
-/* USER CODE END PTD */
+    // ETH hardware init (clocks + GPIO)
+    ETH_HW_Init();
 
-/* Private define ------------------------------------------------------------*/
-/* USER CODE BEGIN PD */
+    // configure MAC address
+    static const uint8_t MACAddr[6] = {0x00, 0x80, 0xE1, 0x00, 0x00, 0x00};
+    ETH->MACA0HR = ((uint32_t)MACAddr[5] << 8)  |  (uint32_t)MACAddr[4];
+    ETH->MACA0LR = ((uint32_t)MACAddr[3] << 24) | ((uint32_t)MACAddr[2] << 16)
+                 | ((uint32_t)MACAddr[1] << 8)  |  (uint32_t)MACAddr[0];
 
-/* DUAL_CORE_BOOT_SYNC_SEQUENCE: Define for dual core boot synchronization    */
-/*                             demonstration code based on hardware semaphore */
-/* This define is present in both CM7/CM4 projects                            */
-/* To comment when developping/debugging on a single core                     */
-#define DUAL_CORE_BOOT_SYNC_SEQUENCE
+    // promiscuous mode, disable DA inverse filter
+    ETH->MACPFR |=  ETH_MACPFR_PM;
+    ETH->MACPFR &= ~ETH_MACPFR_DAIF;
 
-#if defined(DUAL_CORE_BOOT_SYNC_SEQUENCE)
-#ifndef HSEM_ID_0
-#define HSEM_ID_0 (0U) /* HW semaphore 0*/
-#endif
-#endif /* DUAL_CORE_BOOT_SYNC_SEQUENCE */
+    // enable timestamping PTP
+    uint32_t ssinc_value = 16;
+    ETH->MACTSCR |= ETH_MACTSCR_TSENA;
+    ETH->MACSSIR = ssinc_value;
+    ETH->MACSTSUR = 0;
+    ETH->MACSTNUR = 0;
+    ETH->MACTSCR |= ETH_MACTSCR_TSINIT;
 
-/* USER CODE END PD */
+    // Optional: wait for hardware to clear TSINIT
+    while (ETH->MACTSCR & ETH_MACTSCR_TSINIT)
+    {
+    }
 
-/* Private macro -------------------------------------------------------------*/
-/* USER CODE BEGIN PM */
+    // init DMA descriptor table — point each descriptor at its SRAM1 slot
+    for (uint32_t i = 0; i < RING_SLOTS; i++) {
+    	DMARxDscrTab[i].RDES0 = 0;
+    	DMARxDscrTab[i].RDES1 = 0;
+    	DMARxDscrTab[i].RDES2 = (uint32_t)ntcm_ring[i].data;
+    	DMARxDscrTab[i].RDES3 = 0x80000000U     // OWN bit
+    							| 0x40000000U   // IOC (interrupt on completion)
+								| 0x01000000U;  // BUF1V (Buffer 1 Address Valid)
+    }
 
-/* USER CODE END PM */
+    // point DMA to descriptor ring
+    ETH->DMACRDLAR = (uint32_t)&DMARxDscrTab[0];
+    ETH->DMACRDRLR = RING_SLOTS - 1;
+    ETH->DMACRDTPR = (uint32_t)&DMARxDscrTab[RING_SLOTS - 1];
 
-/* Private variables ---------------------------------------------------------*/
+    // enable Rx DMA channel and MAC receiver
+    ETH->DMACRCR |= ETH_DMACRCR_SR;
+    ETH->MACCR   |= ETH_MACCR_RE;
 
-/* USER CODE BEGIN PV */
-
-/* USER CODE END PV */
-
-/* Private function prototypes -----------------------------------------------*/
-void SystemClock_Config(void);
-/* USER CODE BEGIN PFP */
-
-/* USER CODE END PFP */
-
-/* Private user code ---------------------------------------------------------*/
-/* USER CODE BEGIN 0 */
-
-/* USER CODE END 0 */
-
-/**
-  * @brief  The application entry point.
-  * @retval int
-  */
-int main(void)
-{
-
-  /* USER CODE BEGIN 1 */
-
-  /* USER CODE END 1 */
-/* USER CODE BEGIN Boot_Mode_Sequence_0 */
-#if defined(DUAL_CORE_BOOT_SYNC_SEQUENCE)
-  int32_t timeout;
-#endif /* DUAL_CORE_BOOT_SYNC_SEQUENCE */
-/* USER CODE END Boot_Mode_Sequence_0 */
-
-/* USER CODE BEGIN Boot_Mode_Sequence_1 */
-#if defined(DUAL_CORE_BOOT_SYNC_SEQUENCE)
-  /* Wait until CPU2 boots and enters in stop mode or timeout*/
-  timeout = 0xFFFF;
-  while((__HAL_RCC_GET_FLAG(RCC_FLAG_D2CKRDY) != RESET) && (timeout-- > 0));
-  if ( timeout < 0 )
-  {
-  Error_Handler();
-  }
-#endif /* DUAL_CORE_BOOT_SYNC_SEQUENCE */
-/* USER CODE END Boot_Mode_Sequence_1 */
-  /* MCU Configuration--------------------------------------------------------*/
-
-  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init();
-
-  /* USER CODE BEGIN Init */
-
-  /* USER CODE END Init */
-
-  /* Configure the system clock */
-  SystemClock_Config();
-/* USER CODE BEGIN Boot_Mode_Sequence_2 */
-#if defined(DUAL_CORE_BOOT_SYNC_SEQUENCE)
-/* When system initialization is finished, Cortex-M7 will release Cortex-M4 by means of
-HSEM notification */
-/*HW semaphore Clock enable*/
-__HAL_RCC_HSEM_CLK_ENABLE();
-/*Take HSEM */
-HAL_HSEM_FastTake(HSEM_ID_0);
-/*Release HSEM in order to notify the CPU2(CM4)*/
-HAL_HSEM_Release(HSEM_ID_0,0);
-/* wait until CPU2 wakes up from stop mode */
-timeout = 0xFFFF;
-while((__HAL_RCC_GET_FLAG(RCC_FLAG_D2CKRDY) == RESET) && (timeout-- > 0));
-if ( timeout < 0 )
-{
-Error_Handler();
-}
-#endif /* DUAL_CORE_BOOT_SYNC_SEQUENCE */
-/* USER CODE END Boot_Mode_Sequence_2 */
-
-  /* USER CODE BEGIN SysInit */
-
-  /* USER CODE END SysInit */
-
-  /* Initialize all configured peripherals */
-  MX_GPIO_Init();
-  MX_ETH_Init();
-  /* USER CODE BEGIN 2 */
-  idps_app_init();
-  /* USER CODE END 2 */
-
-  /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
-  while (1)
-  {
-    /* USER CODE END WHILE */
-	idps_app_run();
-    /* USER CODE BEGIN 3 */
-  }
-  /* USER CODE END 3 */
+    // enable Rx interrupts
+    ETH->DMACIER |= ETH_DMACIER_RIE | ETH_DMACIER_RBUE;
 }
 
-/**
-  * @brief System Clock Configuration
-  * @retval None
-  */
-void SystemClock_Config(void)
-{
-  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
-  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+volatile uint8_t eth_rx_ready = 0;
 
-  /** Supply configuration update enable
-  */
-  HAL_PWREx_ConfigSupply(PWR_DIRECT_SMPS_SUPPLY);
+int main(void){
+    // system clock and CMSIS SysTick
+    SystemClock_Config();
+    SystemCoreClockUpdate();
+    SysTick_Config(SystemCoreClock / 10); //fire an interrupt every 0.1s
 
-  /** Configure the main internal regulator output voltage
-  */
-  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE3);
+    // dual core handshake: mode 2 (simultaneous boot)
+    HSEM_Init();
+    HSEM_Release();
 
-  while(!__HAL_PWR_GET_FLAG(PWR_FLAG_VOSRDY)) {}
+    // peripheral init
+    ETH_Init();
 
-  /** Initializes the RCC Oscillators according to the specified parameters
-  * in the RCC_OscInitTypeDef structure.
-  */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
-  RCC_OscInitStruct.HSIState = RCC_HSI_DIV1;
-  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
-  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
-  {
-    Error_Handler();
-  }
+    // main app
+    nfem_init(&flow); // init nfem module accumulator
+    uint32_t win_start = GetTick();
+    uint32_t win_actual = 0;
 
-  /** Initializes the CPU, AHB and APB buses clocks
-  */
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2
-                              |RCC_CLOCKTYPE_D3PCLK1|RCC_CLOCKTYPE_D1PCLK1;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
-  RCC_ClkInitStruct.SYSCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.AHBCLKDivider = RCC_HCLK_DIV1;
-  RCC_ClkInitStruct.APB3CLKDivider = RCC_APB3_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_APB1_DIV1;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_APB2_DIV1;
-  RCC_ClkInitStruct.APB4CLKDivider = RCC_APB4_DIV1;
+    while(1){
+        if (eth_rx_ready){
+            eth_rx_ready = 0;  // clear flag
+            
+            // process all available slots
+            for (uint32_t i = 0; i < RING_SLOTS; i++){
+                // check OWN bit (bit 31): 0 = CPU owns (data ready)
+                if ((DMARxDscrTab[i].RDES3 & 0x80000000U) == 0){
+                    
+                    // descriptor table (packet length)
+                    uint32_t frame_len = (DMARxDscrTab[i].RDES3 >> 0) & 0x3FFF;
+                    ntcm_ring[i].len = frame_len;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_1) != HAL_OK)
-  {
-    Error_Handler();
-  }
+                    // descriptor table PTP (timestamps)
+                    uint32_t ts_sec = DMARxDscrTab[i].RDES0;
+                    uint32_t ts_ns = DMARxDscrTab[i].RDES1;
+                    ntcm_ring[i].timestamp = (ts_sec * 1000000ULL) + (ts_ns / 1000);
+                    
+                    // ntcm() => PARSE_OK
+                    if(ntcm(ntcm_ring[i].data, ntcm_ring[i].len, &ntcm_ring[i]) == PARSE_OK){
+                        // update accumulator
+                        win_actual = GetTick();
+                        nfem_update(&ntcm_ring[i], &flow);
+
+                        // if window elapsed
+                        if((win_actual - win_start)*10 >= WINDOW_DURATION){
+                            // start new window
+                            win_start = GetTick();
+
+                            // push features
+                            nfem_finalize(&flow, feat);
+
+                            // run DE
+                            if(dt_predict(feat) != LABEL_NORMAL){
+                                // HSEM interrupt to CM4
+                            }
+                        }
+                    }
+                    
+                    // drop slot => return ownership to DMA
+                    DMARxDscrTab[i].RDES3 = 0x80000000U | 0x40000000U | 0x01000000U;
+                }
+            }
+        }
+    }
 }
 
-/* USER CODE BEGIN 4 */
-
-/* USER CODE END 4 */
-
-/**
-  * @brief  This function is executed in case of error occurrence.
-  * @retval None
-  */
-void Error_Handler(void)
-{
-  /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
-  __disable_irq();
-  while (1)
-  {
-  }
-  /* USER CODE END Error_Handler_Debug */
-}
-#ifdef USE_FULL_ASSERT
-/**
-  * @brief  Reports the name of the source file and the source line number
-  *         where the assert_param error has occurred.
-  * @param  file: pointer to the source file name
-  * @param  line: assert_param error line source number
-  * @retval None
-  */
-void assert_failed(uint8_t *file, uint32_t line)
-{
-  /* USER CODE BEGIN 6 */
-  /* User can add his own implementation to report the file name and line number,
-     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
-  /* USER CODE END 6 */
-}
-#endif /* USE_FULL_ASSERT */

@@ -1,4 +1,3 @@
-
 #define TS_N_STRATEGIES   2
 #define TS_S_ISOLATE      0    /* Block / alert + block on STM32 */
 #define TS_S_WAIT         1    /* Log only, notify on threshold  */

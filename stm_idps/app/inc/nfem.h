@@ -1,7 +1,7 @@
 #ifndef NFEM_H
 #define NFEM_H
 
-#include "top.h"
+#include "idps.h"
 
 /*
 static const char *FEATURE_NAMES[IEC104_FEATURE_COUNT] = {
@@ -23,8 +23,8 @@ static const char *FEATURE_NAMES[IEC104_FEATURE_COUNT] = {
 };
 */
 
-void nfem_init(void);
-void nfem_update(const Packet_t *pkt);
-void nfem_finalize(float feat[IEC104_FEATURE_COUNT]);
+void nfem_init(Flow *flow);
+void nfem_update(Packet_t *pkt, Flow *flow);
+void nfem_finalize(Flow *flow, float feat[IEC104_FEATURE_COUNT]);
 
 #endif /* NFEM_H */

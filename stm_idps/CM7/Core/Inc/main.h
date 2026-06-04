@@ -1,69 +1,60 @@
-/* USER CODE BEGIN Header */
-/**
-  ******************************************************************************
-  * @file           : main.h
-  * @brief          : Header for main.c file.
-  *                   This file contains the common defines of the application.
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2026 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
-  */
-/* USER CODE END Header */
-
-/* Define to prevent recursive inclusion -------------------------------------*/
 #ifndef __MAIN_H
 #define __MAIN_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+/*
+ * ========================================================================================
+ * INCLUDES
+ * ========================================================================================
+ */
+#include "stm32h7xx.h"
+#include "stm32h755xx.h"
+#include "system_stm32h7xx.h"
 
-/* Includes ------------------------------------------------------------------*/
-#include "stm32h7xx_hal.h"
+#include "idps.h"
+#include "system_it.h"
+#include "system_init.h"
 
-/* Private includes ----------------------------------------------------------*/
-/* USER CODE BEGIN Includes */
-#include "app.h"
-/* USER CODE END Includes */
+/*
+ * ========================================================================================
+ * DEFENITIONS
+ * ========================================================================================
+ */
 
-/* Exported types ------------------------------------------------------------*/
-/* USER CODE BEGIN ET */
+#define RING_SLOTS 64U
+#define ETH_RX_BUF_SIZE 1536U
 
-/* USER CODE END ET */
+// macro helper
+#define GPIO_AF_SET(port, pin, af)                                            \
+do {                                                                          \
+    (port)->MODER    &= ~(3U << ((pin) * 2));                                 \
+    (port)->MODER    |=  (2U << ((pin) * 2));                                 \
+    (port)->OSPEEDR  &= ~(3U << ((pin) * 2));                                 \
+    (port)->OSPEEDR  |=  (3U << ((pin) * 2));                                 \
+    (port)->AFR[(pin) >> 3] &= ~(15U << (((pin) & 0x07) * 4));                \
+    (port)->AFR[(pin) >> 3] |= ((uint32_t)(af) << (((pin) & 0x07) * 4));      \
+} while(0)
 
-/* Exported constants --------------------------------------------------------*/
-/* USER CODE BEGIN EC */
+/*
+ * ========================================================================================
+ * STRUCTS
+ * ========================================================================================
+ */
 
-/* USER CODE END EC */
+// DMA descriptor table in .bss
+typedef struct {
+    /* hardware DMA strictly expects a 4-word (16-byte) descriptor in memory */
+	__IO uint32_t RDES0;
+	__IO uint32_t RDES1;
+	__IO uint32_t RDES2;   /* buffer pointer */
+	__IO uint32_t RDES3;   /* OWN bit + frame length */
+} ETH_DMADesc_t;
 
-/* Exported macro ------------------------------------------------------------*/
-/* USER CODE BEGIN EM */
+/*
+ * ========================================================================================
+ * EXTERNAL DECLARATIONS
+ * ========================================================================================
+ */
 
-/* USER CODE END EM */
-
-/* Exported functions prototypes ---------------------------------------------*/
-void Error_Handler(void);
-
-/* USER CODE BEGIN EFP */
-
-/* USER CODE END EFP */
-
-/* Private defines -----------------------------------------------------------*/
-
-/* USER CODE BEGIN Private defines */
-
-/* USER CODE END Private defines */
-
-#ifdef __cplusplus
-}
-#endif
+extern volatile uint32_t systick_ms;
 
 #endif /* __MAIN_H */

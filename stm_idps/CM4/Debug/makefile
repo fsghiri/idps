@@ -9,10 +9,10 @@ RM := rm -rf
 
 # All of the sources participating in the build are defined here
 -include sources.mk
--include Drivers/STM32H7xx_HAL_Driver/subdir.mk
+-include src/subdir.mk
+-include Source/subdir.mk
 -include Core/Startup/subdir.mk
 -include Core/Src/subdir.mk
--include Common/Src/subdir.mk
 -include objects.mk
 
 ifneq ($(MAKECMDGOALS),clean)
@@ -61,8 +61,8 @@ all: main-build
 main-build: idps_CM4.elf secondary-outputs
 
 # Tool invocations
-idps_CM4.elf idps_CM4.map: $(OBJS) $(USER_OBJS) C:\Users\fsghi\Downloads\PFA\idps\CM4\STM32H755ZITX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "idps_CM4.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\fsghi\Downloads\PFA\idps\CM4\STM32H755ZITX_FLASH.ld" --specs=nosys.specs -Wl,-Map="idps_CM4.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+idps_CM4.elf idps_CM4.map: $(OBJS) $(USER_OBJS) C:\Users\fsghi\Downloads\PFA\idps\stm_idps\CM4\STM32H755ZITX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "idps_CM4.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\fsghi\Downloads\PFA\idps\stm_idps\CM4\STM32H755ZITX_FLASH.ld" --specs=nosys.specs -Wl,-Map="idps_CM4.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 

@@ -1,5 +1,5 @@
-#ifndef TOP_H
-#define TOP_H
+#ifndef IDPS_H
+#define IDPS_H
 
 /*
  * ========================================================================================
@@ -7,7 +7,6 @@
  * ========================================================================================
  */
 
-#include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
@@ -27,7 +26,6 @@
 #define ETH_HDR_LEN     14
 #define IPV4_ETHERTYPE  0x0800
 #define IP_PROTO_TCP    6
-#define NTCM_RX_RING_SIZE   16U
 
 /*NFEM DEFINITIONS*/
 #define ETH_HDR_LEN           14
@@ -36,7 +34,7 @@
 #define MAX_APDU_PER_PKT      16
 #define IDLE_THRESHOLD_US     1000000ULL
 #define IEC104_FEATURE_COUNT  15
-#define WINDOW_DURATION_US 120 * 1000000ULL
+#define WINDOW_DURATION 120
 
 /*
  * ========================================================================================
@@ -45,19 +43,6 @@
  */
 
 /*NTCM STRUCTS*/
-typedef struct {
-    uint8_t  data[1536];
-    uint16_t length;
-    uint32_t timestamp_ms;
-    uint8_t  valid;
-} NTCM_FrameSlot_t;
-
-typedef struct {
-    NTCM_FrameSlot_t slots[NTCM_RX_RING_SIZE];
-    volatile uint8_t head;
-    volatile uint8_t tail;
-} NTCM_RingBuffer_t;
-
 typedef enum {
     PARSE_OK,
     PARSE_DROP_NOT_IPV4,
@@ -66,16 +51,18 @@ typedef enum {
     PARSE_DROP_NOT_IEC104,
 } ParseResult_t;
 
-/* Packet direction */
-typedef enum { IEC104_FW = 0, IEC104_BW = 1 } IEC104Dir;
+typedef enum { 
+    IEC104_FW = 0, 
+    IEC104_BW = 1 
+} IEC104Dir;
 
 typedef struct {
-    const uint8_t *data;    // ntcm
-    int len;                // given now but should be calculated from ethernet stream
-    uint32_t src_ip;        // ntcm
-    uint32_t dst_ip;        // ntcm
+    uint8_t *data; //1536
+    int len;                    
+    uint32_t src_ip;            
+    uint32_t dst_ip;            
     uint64_t timestamp;
-    IEC104Dir direction;    // ntcm
+    IEC104Dir direction;
 } Packet_t;
 
 /*NFEM*/
@@ -89,15 +76,15 @@ typedef struct {
 } Stat;
 
 typedef struct {
-    const uint8_t *data;
-    int            len;
-} TcpPayload;
-
-typedef struct {
     uint32_t lens[MAX_APDU_PER_PKT];
     int      count;
     int      u_count;   // U-format APDUs (ctrl byte bits[1:0] == 11)
 } ApduScan;
+
+typedef struct {
+    const uint8_t *data;
+    int            len;
+} TcpPayload;
 
 typedef struct {
     Stat     apdu_all;        // APDU length, all directions
@@ -123,4 +110,8 @@ typedef enum {
     LABEL_INJECTION = 2
 } IEC104_Label;
 
-#endif /* TOP_H*/
+#include "nfem.h"
+#include "ntcm.h"
+#include "de.h"
+
+#endif /* IDPS_H*/

@@ -50,6 +50,10 @@ MEMORY
   RAM_D2 (xrw)   : ORIGIN = 0x30000000, LENGTH = 288K
   RAM_D3 (xrw)   : ORIGIN = 0x38000000, LENGTH = 64K
   ITCMRAM (xrw)  : ORIGIN = 0x00000000, LENGTH = 64K
+
+  SRAM1 (xrw) : ORIGIN = 0x30000000, LENGTH = 256K
+  SRAM2 (xrw) : ORIGIN = 0x30040000, LENGTH = 32K
+  SRAM4 (xrw) : ORIGIN = 0x38000000, LENGTH = 4K
 }
 
 /* Sections */
@@ -187,4 +191,28 @@ SECTIONS
   }
 
   .ARM.attributes 0 : { *(.ARM.attributes) }
+
+  /*NTCM section (SRAM1 D2 DOMAIN)*/
+  .NTCMSection (NOLOAD) :
+  {
+      . = ALIGN(32);
+      *(.NTCMSection)
+      . = ALIGN(4);
+  } >SRAM1
+
+  /*NFEM section (SRAM2 D2 DOMAIN)*/
+  .NFEMSection (NOLOAD) :
+  {
+      . = ALIGN(32);
+      *(.NFEMSection)
+      . = ALIGN(4);
+  } >SRAM2
+
+  /*DE section (SRAM4 D3 DOMAIN)*/
+  .DESection (NOLOAD) :
+  {
+      . = ALIGN(32);
+      *(.DESection)
+      . = ALIGN(4);
+  } >SRAM4
 }
